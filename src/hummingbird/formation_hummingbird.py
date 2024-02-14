@@ -16,6 +16,33 @@ class HummingbirdFormation:
                                          node_name='formation_hummingbirds')
         self.leader = self.drones[self.leader_id - 1]
 
+    def formation_control(self, goal_position):
+        '''Move drones in formation
+        '''
+        follower_ids = list(range(1, self.number_of_drones + 1))
+        follower_ids.remove(self.leader_id)
+        ## before leader reached goal 
+        while not self.leader.is_at_goal(goal_position):
+            velo_vector = self.get_composition_vector(self.leader_id, goal_position)
+            self.leader.move_by_velo_vector(velo_vector)
+            for id in follower_ids:
+                velo_vector = self.get_composition_vector(id, goal_position)
+                self.drones[id - 1].move_by_velo_vector(velo_vector)
+            self.rate.sleep()
+        ## after leader reached goal 
+        reached_goals = 1
+        goal_positions = numpy.empty(self.number_of_drones, dtype=Point)
+        for id in follower_ids:
+            goal_positions[id - 1] = self.get_formation_position(id) 
+        while reached_goals < self.number_of_drones:
+            for id in follower_ids:
+                if not self.drones[id - 1].is_at_goal(goal_positions[id - 1]): 
+                    velo_vector = self.get_composition_vector(id, goal_positions[id - 1])
+                    self.drones[id - 1].move_by_velo_vector(velo_vector)
+                else:
+                    reached_goals += 1
+            self.rate.sleep()
+
     def get_composition_vector(self, i, goal_position):
         oa_vector = self.drones[i-1].get_oa_vector()
         r_vector = self.get_sum_r_vector(i)
@@ -26,7 +53,7 @@ class HummingbirdFormation:
         else:
             f_vector = self.get_f_vector(i)
             composition_vector = add_vector(oa_vector, r_vector, ca_vector, f_vector)
-        return get_constrained_vector(composition_vector, v_max)        
+        return composition_vector      
     
     def get_ca_vector(self, i, j):
         '''Get jth drone's collision avoidance vector on ith drone
@@ -83,12 +110,12 @@ class HummingbirdFormation:
         on ith drone
         '''
         if i < self.leader_id:
-            same_wing_drones_ids = list(range(1, self.leader_id)).remove(i)
+            same_wing_drones_ids = list(range(1, self.leader_id + 1)).remove(i)
         elif i == self.leader_id:
             same_wing_drones_ids = list(range(1, 
                                               self.number_of_drones + 1)).remove(i)
         else:
-            same_wing_drones_ids = list(range((self.leader_id + 1), 
+            same_wing_drones_ids = list(range((self.leader_id), 
                                         self.number_of_drones + 1)).remove(i)
         sum_r_vector = Vector3(0, 0, 0)
         if same_wing_drones_ids:
@@ -123,31 +150,17 @@ class HummingbirdFormation:
             - distance_to_leader * math.sin(follower_to_leader_direction) 
         return Point(x, y, self.leader.height)
     
-    def formation_control(self, goal_position):
-        follower_ids = list(range(1, self.number_of_drones + 1))
-        follower_ids.remove(self.leader_id)
-        ## before leader reached goal 
-        while not self.leader.is_at_goal(goal_position):
-            velo_vector = self.get_composition_vector(self.leader_id, goal_position)
-            self.leader.move_by_velo_vector(velo_vector)
-            for id in follower_ids:
-                velo_vector = self.get_composition_vector(id, goal_position)
-                self.drones[id - 1].move_by_velo_vector(velo_vector)
-            self.rate.sleep()
-        ## after leader reached goal 
-        reached_goals = 1
-        goal_positions = numpy.empty(self.number_of_drones, dtype=Point)
-        for id in follower_ids:
-            goal_positions[id - 1] = self.get_formation_position(id) 
-        while reached_goals < self.number_of_drones:
-            for id in follower_ids:
-                if not self.drones[id - 1].is_at_goal(goal_positions[id - 1]): 
-                    velo_vector = self.get_composition_vector(id, goal_position)
-                    self.drones[id - 1].move_by_velo_vector(velo_vector)
-                else:
-                    reached_goals += 1
-            self.rate.sleep()
+    def wait_step_finished(self):
+        '''Wait until step is finished'''
+        drones_finished_step = 0
+        while True:
+            for i in range(self.number_of_drones):
+                if self.drones[i].is_at_goal_pose(self.drones[i].virtual_goal_pose):
+                    drones_finished_step += 1
+            if drones_finished_step < self.number_of_drones:
+                drones_finished_step = 0
+            else:
+                break
 
-            
-                    
+    
             

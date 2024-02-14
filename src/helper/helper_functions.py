@@ -52,12 +52,20 @@ def get_unit_vector(vector):
         unit_vector = mul_vector(vector, 1 / norm)
     return unit_vector
 
-def get_distance(point_1, point_2):
+def get_distance_2D(point_1, point_2):
     ''' Return distance of two 2D points
     point_1, point_2 are in (x, y) form'''
 
     return math.sqrt((point_1.x - point_2.x) ** 2 + 
                      (point_1.y - point_2.y) ** 2)
+
+def get_distance_3D(point_1, point_2):
+    ''' Return distance of two 3D points
+    point_1, point_2 are in (x, y, z) form'''
+
+    return math.sqrt((point_1.x - point_2.x) ** 2 + 
+                     (point_1.y - point_2.y) ** 2 +
+                     (point_1.z - point_2.z) ** 2)
 
 def mul_vector(vector, k):
     '''Return k * vector'''

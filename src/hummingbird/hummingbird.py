@@ -18,7 +18,7 @@ r_a = 0.3
 r_s = 2.0
 v_max = 2.0
 d_default = 0.8
-a_default = 0.3 * math.pi / 4
+a_default = math.pi / 4
 
 k_o = 1.0
 k_c = 0.12
@@ -29,11 +29,11 @@ k_g = 0.6
 b_c = 2.5
 b_r = 2.5
 
-v_mtg_max = 20
+v_mtg_max = 1
 height_threshold = 0.05
 
-linear_error = 0.05
-
+linear_error = 0.1
+angular_error = 0.3
 class Hummingbird:
     def __init__(self, control_freq = 50, name = 'hummingbird', node_name = 'hummingbird'):
         self.control_freq = control_freq
@@ -62,6 +62,7 @@ class Hummingbird:
         '''Move hummingbird by velocity vector'''
         virtual_goal_pose = self.get_virtual_goal_pose(velo_vector)
         self.__send_goal(virtual_goal_pose)
+        self.virtual_goal_pose = virtual_goal_pose
         self.velocity_vector = velo_vector
     
     def __update_pose_callback(self, msg):
@@ -105,15 +106,15 @@ class Hummingbird:
         goal_pose is Point(x y z) '''
 
         drone_to_goal_vector = mul_vector(get_2D_vector(self.pose.position, goal_position), k_g)
-        return drone_to_goal_vector
-        # return get_constrained_vector(drone_to_goal_vector, v_mtg_max)
+        # return drone_to_goal_vector
+        return get_constrained_vector(drone_to_goal_vector, v_mtg_max)
 
     def get_oa_vector(self):
         obstacle_position = self.obstacle_position
         if obstacle_position == None:
             oa_vector = Vector3(0, 0, 0)
         else:
-            obstacle_distance = get_distance(self.pose.position, obstacle_position)
+            obstacle_distance = get_distance_2D(self.pose.position, obstacle_position)
             magnitude = k_o * ((1 / obstacle_distance ** 2) - (1 / r_s ** 2))
             drone_to_obstalce_vector = get_2D_vector(self.pose.position, obstacle_position)
             oa_vector = mul_vector(get_unit_vector(drone_to_obstalce_vector), -magnitude)
@@ -136,6 +137,7 @@ class Hummingbird:
     def get_virtual_goal_pose(self, velo_vector):
         '''Measure virtual_goal_pose from velocity vector 
         '''
+        velo_vector = get_constrained_vector(velo_vector, v_max)
         control_period = 1 / self.control_freq
         drone_position = self.pose.position
         virtual_position = Point(drone_position.x + control_period * velo_vector.x,
@@ -153,5 +155,16 @@ class Hummingbird:
 
     def is_at_goal(self, goal_position):
         '''Return true if drone is within linear_error from goal'''
-        goal_distance = get_distance(self.pose.position, goal_position)
+        goal_distance = get_distance_2D(self.pose.position, goal_position)
         return goal_distance < linear_error
+    
+    def is_at_goal_pose(self, goal_pose):
+        '''Return true if drone is in goal_pose'''
+        goal_distance = get_distance_3D(self.pose.position, goal_pose.position)
+        euleurs = efq([goal_pose.orientation.x, 
+                       goal_pose.orientation.y, 
+                       goal_pose.orientation.z, 
+                       goal_pose.orientation.w], 
+                       'sxyz')
+        goal_yaw = euleurs[2]
+        return goal_distance < linear_error ##and abs(goal_yaw - self.yaw) < angular_error
